@@ -1,4 +1,4 @@
-import { RequestHandler, Response } from "express";
+import { NextFunction, RequestHandler, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Request as JWTRequest } from "express-jwt";
@@ -8,6 +8,8 @@ import createHttpError from "http-errors";
 import { body, validationResult } from "express-validator";
 import {
   emailValidator,
+  newPasswordValidator,
+  oldPasswordValidator,
   passwordValidator,
   usernameValidator,
 } from "../middlewares/userValidators.js";
@@ -20,7 +22,7 @@ const validate_field: RequestHandler = (req, res) => {
       .json(
         createHttpError(400, "Invalid field value", { errors: result.array() })
       );
-  res.sendStatus(200);
+  res.sendStatus(204);
 };
 
 export const validate_username = [usernameValidator, validate_field];
@@ -102,6 +104,76 @@ export const login: RequestHandler[] = [
   },
 ];
 
-export const user_get = (req: JWTRequest, res: Response) => {
-  res.json({ message: "user get", user_id: req.auth?.id });
+export const user_get = async (
+  req: JWTRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = await User.findById(req.auth?.id, "username email");
+    if (!user)
+      return res.status(404).json(createHttpError(404, "User not found"));
+    res.status(200).json({ username: user.username, email: user.email });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const user_update = [
+  usernameValidator,
+  emailValidator,
+  oldPasswordValidator,
+  newPasswordValidator,
+  async (req: JWTRequest, res: Response, next: NextFunction) => {
+    const result = validationResult(req);
+    if (!result.isEmpty())
+      return res.status(400).json(
+        createHttpError(400, "Invalid field values", {
+          errors: result.array(),
+        })
+      );
+    try {
+      const user = await User.findById(req.auth?.id).exec();
+      if (!user)
+        return res.status(404).json(createHttpError(404, "User not found"));
+      const isMatch = await bcrypt.compare(req.body.oldPassword, user.password);
+      if (!isMatch)
+        return res.status(400).json(
+          createHttpError(400, "Invalid field values", {
+            errors: [
+              {
+                type: "field",
+                msg: "Password doesn't match current password.",
+                path: "oldPassword",
+                location: "body",
+              },
+            ],
+          })
+        );
+      user.username = req.body.username;
+      user.email = req.body.email;
+      if (req.body.newPassword) {
+        user.password = await bcrypt.hash(req.body.newPassword, 10);
+      }
+      await user.save();
+      res.status(200).json({ username: user.username, email: user.email });
+    } catch (err) {
+      next(err);
+    }
+  },
+];
+
+export const user_delete = async (
+  req: JWTRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { deletedCount } = await User.deleteOne({ _id: req.auth?.id }).exec();
+    if (deletedCount !== 1)
+      return res.status(404).json(createHttpError(404, "User not found"));
+    res.sendStatus(204);
+  } catch (err) {
+    next(err);
+  }
 };
