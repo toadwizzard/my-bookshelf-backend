@@ -5,9 +5,41 @@ import { Request as JWTRequest } from "express-jwt";
 import User from "../models/user.js";
 import config from "../config.js";
 import createHttpError from "http-errors";
+import { body, validationResult } from "express-validator";
+import {
+  emailValidator,
+  passwordValidator,
+  usernameValidator,
+} from "../middlewares/userValidators.js";
+
+const validate_field: RequestHandler = (req, res) => {
+  const result = validationResult(req);
+  if (!result.isEmpty())
+    return res
+      .status(400)
+      .json(
+        createHttpError(400, "Invalid field value", { errors: result.array() })
+      );
+  res.sendStatus(200);
+};
+
+export const validate_username = [usernameValidator, validate_field];
+export const validate_email = [emailValidator, validate_field];
+export const validate_password = [passwordValidator, validate_field];
 
 export const register: RequestHandler[] = [
+  usernameValidator,
+  emailValidator,
+  passwordValidator,
   async (req, res, next) => {
+    const result = validationResult(req);
+    if (!result.isEmpty())
+      return res.status(400).json(
+        createHttpError(400, "Invalid field values", {
+          errors: result.array(),
+        })
+      );
+
     const { username, email, password } = req.body;
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -21,9 +53,30 @@ export const register: RequestHandler[] = [
 ];
 
 export const login: RequestHandler[] = [
+  body("username")
+    .exists()
+    .withMessage("Username is required.")
+    .bail()
+    .trim()
+    .notEmpty()
+    .withMessage("Username is required."),
+  body("password")
+    .exists()
+    .withMessage("Password is required.")
+    .bail()
+    .trim()
+    .notEmpty()
+    .withMessage("Password is required."),
   async (req, res, next) => {
-    const { username, password } = req.body;
+    const result = validationResult(req);
+    if (!result.isEmpty())
+      return res.status(400).json(
+        createHttpError(400, "Invalid field values", {
+          errors: result.array(),
+        })
+      );
 
+    const { username, password } = req.body;
     try {
       const user = await User.findOne({ username }).exec();
       if (!user)

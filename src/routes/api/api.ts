@@ -1,8 +1,9 @@
 import express, { Request, Response, NextFunction } from "express";
 import profileRouter from "./profile.js";
+import registerRouter from "./register.js";
 import createHttpError from "http-errors";
 import { expressjwt } from "express-jwt";
-import { login, register } from "../../controllers/userController.js";
+import { login } from "../../controllers/userController.js";
 import config from "../../config.js";
 
 const router = express.Router();
@@ -16,7 +17,7 @@ router.use(
   profileRouter
 );
 router.post("/login", login);
-router.post("/register", register);
+router.use("/register", registerRouter);
 
 router.use((req, res, next) => {
   next(createHttpError(404));
