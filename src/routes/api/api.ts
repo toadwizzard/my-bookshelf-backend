@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
+import indexRouter from "./index.js";
 import profileRouter from "./profile.js";
 import registerRouter from "./register.js";
 import createHttpError from "http-errors";
@@ -8,6 +9,14 @@ import config from "../../config.js";
 
 const router = express.Router();
 
+router.use(
+  "/",
+  expressjwt({
+    secret: config.jwtSecret,
+    algorithms: ["HS256"],
+  }),
+  indexRouter
+);
 router.use(
   "/profile",
   expressjwt({
