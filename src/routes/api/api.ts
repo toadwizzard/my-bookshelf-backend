@@ -10,14 +10,6 @@ import config from "../../config.js";
 const router = express.Router();
 
 router.use(
-  "/",
-  expressjwt({
-    secret: config.jwtSecret,
-    algorithms: ["HS256"],
-  }),
-  indexRouter
-);
-router.use(
   "/profile",
   expressjwt({
     secret: config.jwtSecret,
@@ -27,6 +19,14 @@ router.use(
 );
 router.post("/login", login);
 router.use("/register", registerRouter);
+router.use(
+  "/",
+  expressjwt({
+    secret: config.jwtSecret,
+    algorithms: ["HS256"],
+  }),
+  indexRouter
+);
 
 router.use((req, res, next) => {
   next(createHttpError(404));
