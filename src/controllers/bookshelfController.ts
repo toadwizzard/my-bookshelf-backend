@@ -66,6 +66,7 @@ export const bookshelf_get: RequestHandler[] = [
 
       const booksWithData = books
         .map((bookInfo) => ({
+          id: bookInfo._id,
           title: bookInfo.book.title,
           author: bookInfo.book.author,
           status: bookInfo.status,
@@ -244,8 +245,56 @@ function getSearchQuery(query: any): string {
 }
 
 export const bookshelf_update_book: RequestHandler[] = [
+  keyValidator,
+  statusValidator,
+  otherNameValidator,
+  dateValidator,
   async (req: JWTRequest, res: Response, next: NextFunction) => {
-    res.json({ message: "bookshelf update book" });
+    const result = validationResult(req);
+    if (!result.isEmpty())
+      return res.status(400).json(
+        createHttpError(400, "Invalid field values", {
+          errors: result.array(),
+        })
+      );
+
+    const { book_key, status, other_name, date } = req.body;
+
+    try {
+      if (!req.auth || req.auth.id === undefined)
+        return res.status(401).json(createHttpError(401));
+
+      const bookInfo = await BookInfo.findById(req.params.id).exec();
+      if (!bookInfo)
+        return res.status(404).json(createHttpError(404, "Book not found"));
+
+      const origBook = await Book.findById(bookInfo.book, "key").exec();
+      const searchKey = stripBookKey(book_key);
+      if (searchKey !== origBook?.key) {
+        let book = await Book.findOne({ key: searchKey }).exec();
+        if (!book) {
+          const bookData = await get_book(searchKey);
+          book = new Book({
+            key: stripBookKey(bookData.key),
+            title: bookData.title,
+            author: bookData.author_name,
+          });
+          await book.save();
+        }
+        bookInfo.book = book._id;
+      }
+
+      bookInfo.status = status;
+      bookInfo.other_name =
+        status === BookStatus.Default ? undefined : other_name;
+      bookInfo.date = status === BookStatus.Default ? undefined : date;
+
+      await bookInfo.save();
+      await bookInfo.populate("book");
+      return res.status(200).json(bookInfo);
+    } catch (err) {
+      next(err);
+    }
   },
 ];
 
@@ -254,5 +303,26 @@ export const bookshelf_delete_book: RequestHandler = async (
   res: Response,
   next: NextFunction
 ) => {
-  res.json({ message: "bookshelf delete book" });
+  if (!req.auth || req.auth.id === undefined)
+    return res.status(401).json(createHttpError(401));
+
+  try {
+    const book = await BookInfo.findById(req.params.id).exec();
+    if (!book)
+      return res.status(404).json(createHttpError(404, "Book not found"));
+    if (book.owner.toString() !== req.auth.id)
+      return res
+        .status(401)
+        .json(
+          createHttpError(401, "User does not have permission to delete book")
+        );
+    const { deletedCount } = await BookInfo.deleteOne({
+      _id: req.params.id,
+      owner: req.auth.id,
+    }).exec();
+    if (deletedCount !== 1) return res.status(409).json(createHttpError(409));
+    res.sendStatus(204);
+  } catch (err) {
+    next(err);
+  }
 };
