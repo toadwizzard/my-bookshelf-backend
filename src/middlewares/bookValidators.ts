@@ -7,14 +7,16 @@ export const keyValidator = body("book_key", "Book key is required.")
   .trim()
   .notEmpty();
 
-export const statusValidator = body("status", "Status is required.")
-  .exists()
-  .bail()
-  .trim()
-  .notEmpty()
-  .bail()
-  .isIn(statusArray())
-  .withMessage("Invalid status.");
+export const statusValidator = (isWishlist: boolean) =>
+  body("status", "Status is required.")
+    .if((value, { req }) => req.body?.status || !isWishlist)
+    .exists()
+    .bail()
+    .trim()
+    .notEmpty()
+    .bail()
+    .isIn(statusArray())
+    .withMessage("Invalid status.");
 
 export const otherNameValidator = body("other_name")
   .optional()
@@ -34,19 +36,21 @@ export const dateValidator = body("date")
   .isDate()
   .withMessage("Date must be in a valid date format.");
 
-export const statusFilterValidator = query("status")
-  .optional()
-  .custom((status) => {
-    if (typeof status !== "string")
-      throw new Error("Status must be a single query parameter.");
-    const statuses = status.split(",");
-    const hasInvalid = statuses.some(
-      (st) => !statusArray().some((valSt) => valSt.toLowerCase() === st)
-    );
-    if (hasInvalid)
-      throw new Error("Status query values must be valid status values.");
-    return true;
-  });
+export const statusFilterValidator = (isWishlist: boolean) =>
+  query("status")
+    .optional()
+    .custom((status) => {
+      if (isWishlist) return true;
+      if (typeof status !== "string")
+        throw new Error("Status must be a single query parameter.");
+      const statuses = status.split(",");
+      const hasInvalid = statuses.some(
+        (st) => !statusArray().some((valSt) => valSt.toLowerCase() === st)
+      );
+      if (hasInvalid)
+        throw new Error("Status query values must be valid status values.");
+      return true;
+    });
 
 export const sortValidator = (paramName: string) =>
   query(paramName)

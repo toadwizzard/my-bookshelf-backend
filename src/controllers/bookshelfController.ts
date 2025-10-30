@@ -26,8 +26,8 @@ interface BookData {
 }
 const log = debug("my-bookshelf-backend:olRequest");
 
-export const bookshelf_get: RequestHandler[] = [
-  statusFilterValidator,
+export const bookshelf_get = (isWishlist: boolean): RequestHandler[] => [
+  statusFilterValidator(isWishlist),
   sortValidator("owner_sort"),
   sortValidator("title_sort"),
   async (req: JWTRequest, res: Response, next: NextFunction) => {
@@ -55,18 +55,26 @@ export const bookshelf_get: RequestHandler[] = [
       );
 
       const books = await BookInfo.find(
-        { owner: req.auth.id },
-        "book status other_name date"
+        {
+          owner: req.auth.id,
+          status: isWishlist
+            ? BookStatus.Wishlist
+            : { $ne: BookStatus.Wishlist },
+        },
+        `book${isWishlist ? "" : " status other_name date"}`
       )
-        .populate<{ book: { title: string; author: string[] | undefined } }>({
+        .populate<{
+          book: { title: string; author: string[] | undefined; key: string };
+        }>({
           path: "book",
-          select: "title author",
+          select: "title author key",
         })
         .exec();
 
       const booksWithData = books
         .map((bookInfo) => ({
           id: bookInfo._id,
+          book_key: bookInfo.book.key,
           title: bookInfo.book.title,
           author: bookInfo.book.author,
           status: bookInfo.status,
@@ -76,14 +84,15 @@ export const bookshelf_get: RequestHandler[] = [
         .filter((book) => {
           let isValid: boolean = true;
           const status = req.query.status as string | undefined;
-          if (status) {
+          if (!isWishlist && status) {
             const statuses = status.split(",");
             isValid =
               statuses.length === 0 ||
               statuses.some((st) => st === book.status.toLowerCase());
           }
           const owner = req.query.owner as string | undefined;
-          if (owner) isValid = isValid && stringMatches(book.owner_name, owner);
+          if (!isWishlist && owner)
+            isValid = isValid && stringMatches(book.owner_name, owner);
           const title = req.query.title as string | undefined;
           if (title) isValid = isValid && stringMatches(book.title, title);
           const author = req.query.author as string | undefined;
@@ -94,7 +103,7 @@ export const bookshelf_get: RequestHandler[] = [
           return isValid;
         });
 
-      if (req.query.owner_sort) {
+      if (!isWishlist && req.query.owner_sort) {
         if (req.query.owner_sort === "asc")
           booksWithData.sort((a, b) =>
             a.owner_name.localeCompare(b.owner_name)
@@ -136,9 +145,9 @@ export const bookshelf_get: RequestHandler[] = [
   },
 ];
 
-export const bookshelf_add: RequestHandler[] = [
+export const bookshelf_add = (isWishlist: boolean): RequestHandler[] => [
   keyValidator,
-  statusValidator,
+  statusValidator(isWishlist),
   otherNameValidator,
   dateValidator,
   async (req: JWTRequest, res: Response, next: NextFunction) => {
@@ -171,9 +180,10 @@ export const bookshelf_add: RequestHandler[] = [
       const bookInfo = new BookInfo({
         owner: req.auth.id,
         book: book._id,
-        status,
-        other_name: status === BookStatus.Default ? undefined : other_name,
-        date: status === BookStatus.Default ? undefined : date,
+        status: isWishlist ? BookStatus.Wishlist : status,
+        other_name:
+          isWishlist || status === BookStatus.Default ? undefined : other_name,
+        date: isWishlist || status === BookStatus.Default ? undefined : date,
       });
       await bookInfo.save();
       await bookInfo.populate("book");
@@ -244,9 +254,11 @@ function getSearchQuery(query: any): string {
   return `/search.json?q=${encodeURIComponent(q)}&fields=key,title,author_name`;
 }
 
-export const bookshelf_update_book: RequestHandler[] = [
+export const bookshelf_update_book = (
+  isWishlist: boolean
+): RequestHandler[] => [
   keyValidator,
-  statusValidator,
+  statusValidator(isWishlist),
   otherNameValidator,
   dateValidator,
   async (req: JWTRequest, res: Response, next: NextFunction) => {
@@ -284,10 +296,21 @@ export const bookshelf_update_book: RequestHandler[] = [
         bookInfo.book = book._id;
       }
 
-      bookInfo.status = status;
+      bookInfo.status = isWishlist
+        ? status
+          ? BookStatus.Default
+          : BookStatus.Wishlist
+        : status;
       bookInfo.other_name =
-        status === BookStatus.Default ? undefined : other_name;
-      bookInfo.date = status === BookStatus.Default ? undefined : date;
+        bookInfo.status === BookStatus.Default ||
+        bookInfo.status === BookStatus.Wishlist
+          ? undefined
+          : other_name;
+      bookInfo.date =
+        bookInfo.status === BookStatus.Default ||
+        bookInfo.status === BookStatus.Wishlist
+          ? undefined
+          : date;
 
       await bookInfo.save();
       await bookInfo.populate("book");

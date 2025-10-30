@@ -10,9 +10,9 @@ import {
 const router = express.Router();
 
 router.use("/search", bookshelf_search);
-router.patch("/book/:id", bookshelf_update_book);
+router.patch("/book/:id", bookshelf_update_book(false));
 router.delete("/book/:id", bookshelf_delete_book);
-router.get("/", bookshelf_get);
-router.post("/", bookshelf_add);
+router.get("/", bookshelf_get(false));
+router.post("/", bookshelf_add(false));
 
 export default router;
