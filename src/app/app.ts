@@ -2,12 +2,14 @@ import apiRouter from "../routes/api/api.js";
 import createHttpError from "http-errors";
 import express, { NextFunction, Request, Response } from "express";
 import logger from "morgan";
+import { corsMiddleware } from "../middlewares/corsMiddleware.js";
 
 const app = express();
 
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(corsMiddleware);
 
 app.use("/api", apiRouter);
 

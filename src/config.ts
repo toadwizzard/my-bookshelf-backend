@@ -4,6 +4,7 @@ interface Config {
   connectionString: string;
   jwtSecret: string;
   jwtExpiration: number;
+  frontendUrl: string;
 }
 
 const config: Config = {
@@ -16,6 +17,7 @@ const config: Config = {
   ),
   jwtSecret: getJwtSecret(process.env.JWT_SECRET),
   jwtExpiration: normalizeJwtExpiration(process.env.JWT_EXPIRATION),
+  frontendUrl: process.env.FRONTEND_URL ?? "",
 };
 
 function normalizePort(port: any): number {
