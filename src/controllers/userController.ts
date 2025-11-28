@@ -13,6 +13,7 @@ import {
   passwordValidator,
   usernameValidator,
 } from "../middlewares/userValidators.js";
+import mongoose from "mongoose";
 
 const validate_field: RequestHandler = (req, res) => {
   const result = validationResult(req);
@@ -110,6 +111,9 @@ export const user_get = async (
   next: NextFunction
 ) => {
   try {
+    if (!mongoose.isObjectIdOrHexString(req.auth?.id)) {
+      return res.status(404).json(createHttpError(404, "User not found"));
+    }
     const user = await User.findById(req.auth?.id, "username email");
     if (!user)
       return res.status(404).json(createHttpError(404, "User not found"));
@@ -133,6 +137,9 @@ export const user_update = [
         })
       );
     try {
+      if (!mongoose.isObjectIdOrHexString(req.auth?.id)) {
+        return res.status(404).json(createHttpError(404, "User not found"));
+      }
       const user = await User.findById(req.auth?.id).exec();
       if (!user)
         return res.status(404).json(createHttpError(404, "User not found"));
@@ -169,6 +176,9 @@ export const user_delete = async (
   next: NextFunction
 ) => {
   try {
+    if (!mongoose.isObjectIdOrHexString(req.auth?.id)) {
+      return res.status(404).json(createHttpError(404, "User not found"));
+    }
     const { deletedCount } = await User.deleteOne({ _id: req.auth?.id }).exec();
     if (deletedCount !== 1)
       return res.status(404).json(createHttpError(404, "User not found"));

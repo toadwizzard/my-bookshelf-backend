@@ -17,6 +17,7 @@ import {
 import { BookStatus } from "../helpers/status.js";
 import { validationResult } from "express-validator";
 import { queryParamToNumber, stringMatches } from "../helpers/utils.js";
+import mongoose from "mongoose";
 
 const OL_BASE_URL = "https://openlibrary.org";
 interface BookData {
@@ -74,7 +75,6 @@ export const bookshelf_get = (isWishlist: boolean): RequestHandler[] => [
       const booksWithData = books
         .map((bookInfo) => ({
           id: bookInfo._id,
-          book_key: bookInfo.book.key,
           title: bookInfo.book.title,
           author: bookInfo.book.author,
           status: bookInfo.status,
@@ -88,7 +88,9 @@ export const bookshelf_get = (isWishlist: boolean): RequestHandler[] => [
             const statuses = status.split(",");
             isValid =
               statuses.length === 0 ||
-              statuses.some((st) => st === book.status.toLowerCase());
+              statuses.some(
+                (st) => st.toLowerCase() === book.status.toLowerCase()
+              );
           }
           const owner = req.query.owner as string | undefined;
           if (!isWishlist && owner)
@@ -144,6 +146,45 @@ export const bookshelf_get = (isWishlist: boolean): RequestHandler[] => [
     }
   },
 ];
+
+export const bookshelf_get_book = (isWishlist: boolean): RequestHandler => {
+  return async (req: JWTRequest, res: Response, next: NextFunction) => {
+    if (!req.auth || req.auth.id === undefined)
+      return res.status(401).json(createHttpError(401));
+    try {
+      if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+        return res.status(404).json(createHttpError(404, "Book not found"));
+      }
+      const book = await BookInfo.findById(req.params.id)
+        .populate<{
+          book: { title: string; author: string[] | undefined; key: string };
+        }>({
+          path: "book",
+          select: "title author key",
+        })
+        .exec();
+      if (!book || (isWishlist && book.status !== BookStatus.Wishlist))
+        return res.status(404).json(createHttpError(404, "Book not found"));
+      if (book.owner.toString() !== req.auth.id)
+        return res
+          .status(401)
+          .json(
+            createHttpError(401, "User does not have permission to delete book")
+          );
+      return res.status(200).json({
+        id: book._id,
+        status: book.status,
+        book_key: book.book.key,
+        title: book.book.title,
+        author: book.book.author,
+        other_name: book.other_name,
+        date: book.date,
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+};
 
 export const bookshelf_add = (isWishlist: boolean): RequestHandler[] => [
   keyValidator,
@@ -276,6 +317,9 @@ export const bookshelf_update_book = (
       if (!req.auth || req.auth.id === undefined)
         return res.status(401).json(createHttpError(401));
 
+      if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+        return res.status(404).json(createHttpError(404, "Book not found"));
+      }
       const bookInfo = await BookInfo.findById(req.params.id).exec();
       if (!bookInfo)
         return res.status(404).json(createHttpError(404, "Book not found"));
@@ -297,7 +341,7 @@ export const bookshelf_update_book = (
       }
 
       bookInfo.status = isWishlist
-        ? status
+        ? status && status !== BookStatus.Wishlist
           ? BookStatus.Default
           : BookStatus.Wishlist
         : status;
@@ -330,6 +374,9 @@ export const bookshelf_delete_book: RequestHandler = async (
     return res.status(401).json(createHttpError(401));
 
   try {
+    if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+      return res.status(404).json(createHttpError(404, "Book not found"));
+    }
     const book = await BookInfo.findById(req.params.id).exec();
     if (!book)
       return res.status(404).json(createHttpError(404, "Book not found"));

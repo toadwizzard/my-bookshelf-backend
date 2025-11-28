@@ -3,6 +3,7 @@ import {
   bookshelf_add,
   bookshelf_delete_book,
   bookshelf_get,
+  bookshelf_get_book,
   bookshelf_search,
   bookshelf_update_book,
 } from "../../controllers/bookshelfController.js";
@@ -10,6 +11,7 @@ import {
 const router = express.Router();
 
 router.use("/search", bookshelf_search);
+router.get("/book/:id", bookshelf_get_book(false));
 router.patch("/book/:id", bookshelf_update_book(false));
 router.delete("/book/:id", bookshelf_delete_book);
 router.get("/", bookshelf_get(false));

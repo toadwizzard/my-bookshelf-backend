@@ -45,7 +45,10 @@ export const statusFilterValidator = (isWishlist: boolean) =>
         throw new Error("Status must be a single query parameter.");
       const statuses = status.split(",");
       const hasInvalid = statuses.some(
-        (st) => !statusArray().some((valSt) => valSt.toLowerCase() === st)
+        (st) =>
+          !statusArray().some(
+            (valSt) => valSt.toLowerCase() === st.toLowerCase()
+          )
       );
       if (hasInvalid)
         throw new Error("Status query values must be valid status values.");
