@@ -21,7 +21,7 @@ const validate_field: RequestHandler = (req, res) => {
     return res
       .status(400)
       .json(
-        createHttpError(400, "Invalid field value", { errors: result.array() })
+        createHttpError(400, "Invalid field value", { errors: result.array() }),
       );
   res.sendStatus(204);
 };
@@ -40,7 +40,7 @@ export const register: RequestHandler[] = [
       return res.status(400).json(
         createHttpError(400, "Invalid field values", {
           errors: result.array(),
-        })
+        }),
       );
 
     const { username, email, password } = req.body;
@@ -48,7 +48,7 @@ export const register: RequestHandler[] = [
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = new User({ username, email, password: hashedPassword });
       await user.save();
-      res.sendStatus(201);
+      res.status(201).json({ message: "User created" });
     } catch (err) {
       next(err);
     }
@@ -76,7 +76,7 @@ export const login: RequestHandler[] = [
       return res.status(400).json(
         createHttpError(400, "Invalid field values", {
           errors: result.array(),
-        })
+        }),
       );
 
     const { username, password } = req.body;
@@ -96,7 +96,7 @@ export const login: RequestHandler[] = [
       const token = jwt.sign(
         { id: user._id, admin: user.admin },
         config.jwtSecret,
-        { expiresIn: config.jwtExpiration }
+        { expiresIn: config.jwtExpiration },
       );
       res.status(200).json({ token, expiresIn: config.jwtExpiration });
     } catch (err) {
@@ -108,7 +108,7 @@ export const login: RequestHandler[] = [
 export const user_get = async (
   req: JWTRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     if (!mongoose.isObjectIdOrHexString(req.auth?.id)) {
@@ -134,7 +134,7 @@ export const user_update = [
       return res.status(400).json(
         createHttpError(400, "Invalid field values", {
           errors: result.array(),
-        })
+        }),
       );
     try {
       if (!mongoose.isObjectIdOrHexString(req.auth?.id)) {
@@ -155,7 +155,7 @@ export const user_update = [
                 location: "body",
               },
             ],
-          })
+          }),
         );
       user.username = req.body.username;
       user.email = req.body.email;
@@ -173,7 +173,7 @@ export const user_update = [
 export const user_delete = async (
   req: JWTRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
     if (!mongoose.isObjectIdOrHexString(req.auth?.id)) {

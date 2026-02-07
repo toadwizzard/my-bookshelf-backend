@@ -17,7 +17,7 @@ router.use(
   expressjwt({
     secret: config.jwtSecret,
     algorithms: ["HS256"],
-  })
+  }),
 );
 
 router.use("/profile", profileRouter);
